@@ -1,0 +1,18 @@
+.agent-chat{max-width:960px;margin:0 auto 24px;overflow:hidden}
+.agent-chat h2{display:flex;align-items:center;gap:9px}
+.chat-thread{height:440px;overflow-y:auto;padding:24px;background:#f8faff;display:flex;flex-direction:column;gap:18px}
+.chat-message{max-width:85%;padding:16px 20px;border-radius:16px;flex-shrink:0}
+.chat-message.assistant{align-self:flex-start;background:#fff;border:1px solid #e2e9f4;border-bottom-left-radius:4px}
+.chat-message.user{align-self:flex-end;background:#2864e8;color:#fff;border-bottom-right-radius:4px}
+.chat-message small{display:block;font-size:10px;font-weight:800;margin-bottom:8px;color:#6b7b96}
+.chat-message.user small,.chat-message.user p{color:#fff}
+.chat-message p{margin:0;font-size:13px;line-height:1.8;color:#35455f;white-space:pre-wrap;overflow-wrap:anywhere}
+.chat-progress{display:flex;align-items:center;gap:10px;font-size:12px;color:#526a92}
+.chat-actions{padding:18px 24px;display:flex;gap:10px;flex-wrap:wrap;border-top:1px solid #edf1f6}
+.chat-composer{padding:0 24px 22px}
+.chat-input-label{display:block;font-size:12px;font-weight:700;margin-bottom:9px}
+.chat-composer>div{display:flex;gap:10px}
+.chat-composer input{flex:1;min-width:0;border:1px solid #dfe5ed;border-radius:9px;padding:13px;font-size:13px}
+.chat-composer input:focus{outline:2px solid #bacdf4;outline-offset:1px}
+.chat-composer>small{display:block;margin-top:10px;color:#8795aa;font-size:11px}
+@media(max-width:680px){.chat-thread{height:380px;padding:16px}.chat-message{max-width:95%;padding:13px}.chat-actions{padding:16px}.chat-composer{padding:0 16px 18px}}
