@@ -1,0 +1,46 @@
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: claimpilot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-claimpilot}
+      POSTGRES_DB: claimpilot
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U claimpilot -d claimpilot"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+  api:
+    profiles: ["full"]
+    build:
+      context: .
+      dockerfile: backend.Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://claimpilot:${POSTGRES_PASSWORD:-claimpilot}@db:5432/claimpilot
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      STORAGE_DIR: /srv/private_uploads
+      CORS_ORIGINS: '["http://localhost:5173","http://127.0.0.1:5173"]'
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - uploads:/srv/private_uploads
+    depends_on:
+      db:
+        condition: service_healthy
+  web:
+    profiles: ["full"]
+    build:
+      context: ./frontend
+    ports:
+      - "127.0.0.1:5173:5173"
+    depends_on:
+      - api
+volumes:
+  postgres_data:
+  uploads:
