@@ -1,0 +1,433 @@
+[
+  {
+    "id": "star-health",
+    "name": "Star Health",
+    "aliases": [
+      "star health",
+      "star health and allied insurance",
+      "star health and allied insurance company limited",
+      "star health and allied insurance company ltd",
+      "star health and allied insurance co ltd"
+    ],
+    "version": "2026-10-13.1",
+    "last_checked": "2026-10-13",
+    "scope": "General India health hospitalization guidance; exact policy, edition, endorsements and TPA instructions must be checked separately.",
+    "sources": [
+      {
+        "id": "claims",
+        "title": "Official claims process",
+        "url": "https://www.starhealth.in/claims/"
+      },
+      {
+        "id": "form",
+        "title": "Reimbursement claim form linked from official claims page",
+        "url": "https://d28c6jni2fmamz.cloudfront.net/CLAIMFORM_89ec9742bd.pdf"
+      }
+    ],
+    "links": [
+      {
+        "label": "Claims and submission instructions",
+        "url": "https://www.starhealth.in/claims/"
+      },
+      {
+        "label": "Download reimbursement form",
+        "url": "https://d28c6jni2fmamz.cloudfront.net/CLAIMFORM_89ec9742bd.pdf"
+      }
+    ],
+    "timelines": [
+      {
+        "label": "Emergency intimation",
+        "text": "Claims page asks for notification within 24 hours of hospitalization.",
+        "source_ids": [
+          "claims"
+        ],
+        "route": "all",
+        "admission_type": "emergency"
+      },
+      {
+        "label": "Planned cashless intimation",
+        "text": "Cashless Anywhere guidance specifies notification 48 hours before admission; confirm the applicable arrangement with the hospital.",
+        "source_ids": [
+          "claims"
+        ],
+        "route": "cashless",
+        "admission_type": "planned"
+      },
+      {
+        "label": "Reimbursement submission: conflicting sources",
+        "text": "Claims page says 15 days after discharge; its linked reimbursement form says 30 days. Contact Star Health promptly to confirm the deadline for your policy. ClaimWeave cannot determine a single deadline from these sources.",
+        "source_ids": [
+          "claims",
+          "form"
+        ],
+        "route": "reimbursement",
+        "conflict": true
+      }
+    ],
+    "documents": [
+      {
+        "name": "Signed claim form, discharge summary, itemized hospital bill and payment receipts",
+        "source_ids": [
+          "claims",
+          "form"
+        ]
+      },
+      {
+        "name": "Prescriptions, pharmacy bills and investigation reports with supporting bills",
+        "source_ids": [
+          "claims"
+        ]
+      },
+      {
+        "name": "Bank payment details and applicable KYC documents",
+        "source_ids": [
+          "claims",
+          "form"
+        ]
+      },
+      {
+        "name": "Accident records, implant invoices/stickers or other treatment-specific records, where applicable",
+        "source_ids": [
+          "form"
+        ]
+      }
+    ],
+    "submission": {
+      "text": "Use the customer portal/app or a branch/advisor. The claims page also instructs sending original reimbursement documents by post or courier. Confirm the destination before sending originals.",
+      "source_ids": [
+        "claims"
+      ]
+    },
+    "cashless": {
+      "text": "Ask the hospital insurance desk to coordinate pre-authorization and confirm the hospital arrangement with Star Health.",
+      "source_ids": [
+        "claims"
+      ]
+    }
+  },
+  {
+    "id": "hdfc-ergo",
+    "name": "HDFC ERGO",
+    "aliases": [
+      "hdfc ergo",
+      "hdfc ergo general insurance",
+      "hdfc ergo general insurance company limited",
+      "hdfc ergo general insurance company ltd",
+      "hdfc ergo general insurance co ltd"
+    ],
+    "version": "2026-10-13.1",
+    "last_checked": "2026-10-13",
+    "scope": "General India health hospitalization guidance; exact policy, edition, endorsements and TPA instructions must be checked separately.",
+    "sources": [
+      {
+        "id": "checklist",
+        "title": "Official document checklist",
+        "url": "https://www.hdfcergo.com/claim/track-health-insurance-claim/document-check-list"
+      },
+      {
+        "id": "process",
+        "title": "Official reimbursement process",
+        "url": "https://www.hdfcergo.com/claim/track-health-insurance-claim/reimbursement"
+      },
+      {
+        "id": "forms",
+        "title": "Official health claim forms",
+        "url": "https://www.hdfcergo.com/download/claim-form/health"
+      },
+      {
+        "id": "cashless",
+        "title": "Official cashless claims process",
+        "url": "https://www.hdfcergo.com/claim/track-health-insurance-claim"
+      }
+    ],
+    "links": [
+      {
+        "label": "Cashless claims guidance",
+        "url": "https://www.hdfcergo.com/claim/track-health-insurance-claim"
+      },
+      {
+        "label": "Reimbursement instructions",
+        "url": "https://www.hdfcergo.com/claim/track-health-insurance-claim/reimbursement"
+      },
+      {
+        "label": "Get the current health claim form",
+        "url": "https://www.hdfcergo.com/download/claim-form/health"
+      }
+    ],
+    "timelines": [
+      {
+        "label": "Planned reimbursement intimation",
+        "text": "Notify HDFC ERGO at least 48 hours before planned hospitalization.",
+        "source_ids": [
+          "checklist"
+        ],
+        "route": "reimbursement",
+        "admission_type": "planned"
+      },
+      {
+        "label": "Emergency reimbursement intimation",
+        "text": "Notify HDFC ERGO within 24 hours of emergency hospitalization.",
+        "source_ids": [
+          "checklist"
+        ],
+        "route": "reimbursement",
+        "admission_type": "emergency"
+      },
+      {
+        "label": "Document submission deadline",
+        "text": "No universal submission deadline was established from the reviewed process page. Check your policy and confirm with the insurer or TPA.",
+        "source_ids": [
+          "process"
+        ],
+        "route": "reimbursement"
+      }
+    ],
+    "documents": [
+      {
+        "name": "Signed claim form with policy number and original discharge summary",
+        "source_ids": [
+          "checklist"
+        ]
+      },
+      {
+        "name": "Itemized final hospital bill, payment receipts, pharmacy invoices with prescriptions and investigation reports",
+        "source_ids": [
+          "checklist"
+        ]
+      },
+      {
+        "name": "NEFT details and cancelled cheque or bank-attested passbook; KYC for claims of INR 1 lakh or more",
+        "source_ids": [
+          "checklist"
+        ]
+      },
+      {
+        "name": "Implant invoice/sticker, past treatment records and MLC/FIR where applicable",
+        "source_ids": [
+          "checklist"
+        ]
+      }
+    ],
+    "submission": {
+      "text": "Follow the reimbursement page for the signed form and supporting documents. Verify the current submission channel and destination with the insurer before dispatch.",
+      "source_ids": [
+        "process"
+      ]
+    },
+    "cashless": {
+      "text": "Use HDFC ERGO's official claims guidance and ask the hospital insurance desk to confirm pre-authorization requirements for your policy.",
+      "source_ids": [
+        "cashless"
+      ]
+    }
+  },
+  {
+    "id": "niva-bupa",
+    "name": "Niva Bupa",
+    "aliases": [
+      "niva bupa",
+      "niva bupa health insurance",
+      "niva bupa health insurance company limited",
+      "max bupa",
+      "niva bupa health insurance company ltd",
+      "niva bupa health insurance co ltd"
+    ],
+    "version": "2026-10-13.1",
+    "last_checked": "2026-10-13",
+    "scope": "General India health hospitalization guidance; exact policy, edition, endorsements and TPA instructions must be checked separately.",
+    "sources": [
+      {
+        "id": "claims",
+        "title": "Official claim portal and FAQ",
+        "url": "https://transaction.nivabupa.com/claims/pages/health-claim.aspx"
+      },
+      {
+        "id": "checklist",
+        "title": "Official claim document checklist",
+        "url": "https://transaction.nivabupa.com/claims/clientlibs/library/docs/Claim%20Document%20Checklist.pdf?v=1.0"
+      },
+      {
+        "id": "form",
+        "title": "Official reimbursement form",
+        "url": "https://transactions.nivabupa.com/pages/doc/claim_form/ReimbursementClaimForm.pdf"
+      }
+    ],
+    "links": [
+      {
+        "label": "Open official claims guidance",
+        "url": "https://transaction.nivabupa.com/claims/pages/health-claim.aspx"
+      },
+      {
+        "label": "Submit documents on Niva Bupa",
+        "url": "https://transactions.nivabupa.com/claims/pages/claimdocupload.aspx"
+      },
+      {
+        "label": "Download reimbursement form",
+        "url": "https://transactions.nivabupa.com/pages/doc/claim_form/ReimbursementClaimForm.pdf"
+      }
+    ],
+    "timelines": [
+      {
+        "label": "Reimbursement submission",
+        "text": "The claim portal asks for submission within 30 days of discharge. Confirm applicability against your policy and claim type.",
+        "source_ids": [
+          "claims"
+        ],
+        "route": "reimbursement"
+      },
+      {
+        "label": "Planned cashless notification",
+        "text": "Contact the insurer/hospital insurance desk at least 48 hours before treatment.",
+        "source_ids": [
+          "claims"
+        ],
+        "route": "cashless",
+        "admission_type": "planned"
+      },
+      {
+        "label": "Emergency cashless notification",
+        "text": "Contact the insurer/hospital insurance desk within 24 hours of admission.",
+        "source_ids": [
+          "claims"
+        ],
+        "route": "cashless",
+        "admission_type": "emergency"
+      }
+    ],
+    "documents": [
+      {
+        "name": "Discharge summary, itemized hospital bill, receipts, prescriptions and pharmacy bills",
+        "source_ids": [
+          "checklist"
+        ]
+      },
+      {
+        "name": "Investigation reports and cancelled cheque with account details",
+        "source_ids": [
+          "checklist"
+        ]
+      },
+      {
+        "name": "KYC for claims of INR 1 lakh or more; accident, implant and diagnosis-specific records where applicable",
+        "source_ids": [
+          "checklist"
+        ]
+      },
+      {
+        "name": "Complete the reimbursement form and check its signature requirements",
+        "source_ids": [
+          "form"
+        ]
+      }
+    ],
+    "submission": {
+      "text": "Submit through the official document-upload portal. Keep originals because the insurer may request them. Portal uploads allow common image formats and PDF, up to 5 MB per file.",
+      "source_ids": [
+        "claims"
+      ]
+    },
+    "cashless": {
+      "text": "Present policy/health-card details at the hospital insurance desk; the hospital submits pre-authorization. Confirm hospital eligibility using the official portal.",
+      "source_ids": [
+        "claims"
+      ]
+    }
+  },
+  {
+    "id": "care-health",
+    "name": "Care Health",
+    "aliases": [
+      "care health",
+      "care health insurance",
+      "care health insurance limited",
+      "religare health insurance",
+      "care health insurance ltd"
+    ],
+    "version": "2026-10-13.1",
+    "last_checked": "2026-10-13",
+    "scope": "General India health hospitalization guidance; exact policy, edition, endorsements and TPA instructions must be checked separately.",
+    "sources": [
+      {
+        "id": "claims",
+        "title": "Official health claim process guidance",
+        "url": "https://www.careinsurance.com/health-insurance/health-insurance-claim"
+      },
+      {
+        "id": "forms",
+        "title": "Official reimbursement and cashless forms",
+        "url": "https://www.careinsurance.com/health-insurance-claim-forms.html"
+      }
+    ],
+    "links": [
+      {
+        "label": "Claims process and assistance",
+        "url": "https://www.careinsurance.com/health-insurance/health-insurance-claim"
+      },
+      {
+        "label": "Get the current claim or pre-authorization form",
+        "url": "https://www.careinsurance.com/health-insurance-claim-forms.html"
+      }
+    ],
+    "timelines": [
+      {
+        "label": "Planned hospitalization notification",
+        "text": "Care's guidance specifies a 48-hour notification window for planned hospitalization. Confirm timing before admission with the insurer/TPA.",
+        "source_ids": [
+          "claims"
+        ],
+        "route": "all",
+        "admission_type": "planned"
+      },
+      {
+        "label": "Emergency notification",
+        "text": "Notify Care within 24 hours of emergency hospitalization.",
+        "source_ids": [
+          "claims"
+        ],
+        "route": "all",
+        "admission_type": "emergency"
+      },
+      {
+        "label": "Document submission deadline",
+        "text": "No universal submission deadline was established from the reviewed page. Check your policy and confirm the applicable deadline with Care or your TPA.",
+        "source_ids": [
+          "claims"
+        ],
+        "route": "reimbursement"
+      }
+    ],
+    "documents": [
+      {
+        "name": "Signed claim form, policy details and policyholder identity proof",
+        "source_ids": [
+          "claims"
+        ]
+      },
+      {
+        "name": "Original hospital bills, receipts and discharge summary",
+        "source_ids": [
+          "claims"
+        ]
+      },
+      {
+        "name": "Prescriptions and investigation reports; indoor case papers where requested",
+        "source_ids": [
+          "claims"
+        ]
+      }
+    ],
+    "submission": {
+      "text": "Use Care's official claims assistance to confirm your submission channel and required originals. Obtain the form for your product from the official forms page.",
+      "source_ids": [
+        "claims",
+        "forms"
+      ]
+    },
+    "cashless": {
+      "text": "Show your policy/health card at the hospital insurance desk; the hospital coordinates pre-authorization with Care.",
+      "source_ids": [
+        "claims"
+      ]
+    }
+  }
+]
