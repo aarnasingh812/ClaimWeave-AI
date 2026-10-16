@@ -1,4 +1,4 @@
-import type {Claim, ClaimInput, ClaimDetail, Document, Workflow, InsurerGuidance} from './types';
+import type {Claim, ClaimInput, ClaimDetail, Document, Workflow, InsurerGuidance, HealthPreparation} from './types';
 const API = (import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
 export const authSession = {
   get: () => sessionStorage.getItem('claimweave_token'),
@@ -19,6 +19,13 @@ async function request<T>(path:string, init?:RequestInit):Promise<T>{
   return response.json() as Promise<T>;
 }
 export const api={
+  planPreparation:(id:string)=>request<{result:HealthPreparation}>(`/api/v1/claims/${encodeURIComponent(id)}/preparation/plan`,{method:'POST'}),
+  preparation:(id:string)=>request<{result:HealthPreparation}>(`/api/v1/claims/${encodeURIComponent(id)}/preparation`),
+  analyzePreparation:(id:string)=>request<{result:HealthPreparation}>(`/api/v1/claims/${encodeURIComponent(id)}/preparation/analyze`,{method:'POST'}),
+  updatePreparation:(id:string,data:Record<string,unknown>)=>request<{result:HealthPreparation}>(`/api/v1/claims/${encodeURIComponent(id)}/preparation`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}),
+  reviewDocument:(id:string,documentId:string,data:Record<string,unknown>)=>request<{result:HealthPreparation}>(`/api/v1/claims/${encodeURIComponent(id)}/documents/${encodeURIComponent(documentId)}/review`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}),
+  approvePreparation:(id:string,revision:number,approved:boolean)=>request<{result:HealthPreparation}>(`/api/v1/claims/${encodeURIComponent(id)}/preparation/approve`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({expected_revision:revision,approved})}),
+  binary:async(path:string)=>{const response=await fetch(`${API}${path}`,{headers:{Authorization:`Bearer ${authSession.get()||''}`}});if(!response.ok){let message='Could not download this file';try{message=(await response.json()).detail||message}catch{}throw new Error(message)}return response.blob()},
   register:(email:string,password:string)=>request<{access_token:string}>('/api/v1/auth/register',{
     method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})}),
   login:(email:string,password:string)=>request<{access_token:string}>('/api/v1/auth/login',{

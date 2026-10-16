@@ -1,0 +1,62 @@
+[
+  {
+    "id": "star-health",
+    "insurer_id": "star-health",
+    "name": "Star Health reimbursement form",
+    "url": "https://d28c6jni2fmamz.cloudfront.net/CLAIMFORM_89ec9742bd.pdf",
+    "source_page": "https://www.starhealth.in/claims/",
+    "scope": "Health reimbursement; check exact policy and edition",
+    "filename": "star-health.pdf",
+    "checked_at": "2026-10-14",
+    "sha256": "7069f965e9f6613826bdded428bcd391a08fb06857bf086c56a57ac860fa691d",
+    "version": "2026-10-14.1"
+  },
+  {
+    "id": "niva-bupa",
+    "insurer_id": "niva-bupa",
+    "name": "Niva Bupa reimbursement form",
+    "url": "https://transactions.nivabupa.com/pages/doc/claim_form/ReimbursementClaimForm.pdf",
+    "source_page": "https://transaction.nivabupa.com/claims/pages/health-claim.aspx",
+    "scope": "Health reimbursement; check exact policy and edition",
+    "filename": "niva-bupa.pdf",
+    "checked_at": "2026-10-14",
+    "sha256": "b5d93b74a697b3e5dc1c86e16e72cd31652d28b653a0df512d9266fd1e9c9508",
+    "version": "2026-10-14.1"
+  },
+  {
+    "id": "care-health",
+    "insurer_id": "care-health",
+    "name": "Care Health reimbursement form (English)",
+    "url": "https://cms.careinsurance.com/cms/public/uploads/download_center/health-claim-form---english.pdf",
+    "source_page": "https://www.careinsurance.com/health-insurance-claim-forms.html",
+    "scope": "Products listed on the official English health form downloads page; confirm your product",
+    "filename": "care-health.pdf",
+    "checked_at": "2026-10-14",
+    "sha256": "17c3acc5d1db9fa5d237469c1afef1ad81da12d3927d2c8ca6e5d90f980620a0",
+    "version": "2026-10-14.1"
+  },
+  {
+    "id": "hdfc-ergo-hospitalization",
+    "insurer_id": "hdfc-ergo",
+    "name": "HDFC ERGO hospitalization form",
+    "url": "https://customer-portal-assets.hdfcergo.com/assets/v2/docs/default-source/downloads/claim-forms/hospitalization-claim-form-410828258118.pdf",
+    "source_page": "https://www.hdfcergo.com/download/claim-form/health",
+    "scope": "Hospitalization form; confirm suitability for your exact product",
+    "filename": "hdfc-ergo-hospitalization.pdf",
+    "checked_at": "2026-10-14",
+    "sha256": "815922d898979a47281dff9abfa95a2515bd491b77014487800fa20146c33eb0",
+    "version": "2026-10-14.1"
+  },
+  {
+    "id": "hdfc-ergo-optima",
+    "insurer_id": "hdfc-ergo",
+    "name": "HDFC ERGO my: Optima Secure form",
+    "url": "https://customer-portal-assets.hdfcergo.com/assets/v2/docs/default-source/downloads/claim-forms/myoptima-secure---cf-58675432702.pdf",
+    "source_page": "https://www.hdfcergo.com/download/claim-form/health",
+    "scope": "my: Optima Secure only; confirm product version/UIN",
+    "filename": "hdfc-ergo-optima.pdf",
+    "checked_at": "2026-10-14",
+    "sha256": "59ea31d360652b468c0a06cfdc86902c64398cf0c58aad7828c6625cbba13cef",
+    "version": "2026-10-14.1"
+  }
+]

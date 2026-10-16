@@ -1,15 +1,25 @@
-# ClaimWeave — Complete Phases 1–4
+# ClaimWeave — Health claim preparation
 
 ## Health intake and insurer guidance
 
-New claims now use a four-step hospitalization intake: policy and claim route,
-patient details, hospitalization, and review. Star Health, HDFC ERGO, Niva Bupa
-and Care Health are supported. Use **Save draft** at any step after selecting an
-insurer, then open the claim from the dashboard and choose **Resume intake**.
-Drafts are saved to the database. Essential fields must be completed and confirmed
-before reimbursement analysis. Draft intake can be edited before analysis;
-attached documents must be removed before changing insurer or policy identity.
-Cashless intake leads to hospital/insurer guidance, not reimbursement analysis.
+New reimbursement claims follow **Claim details → Policy → Documents & help →
+Review & download**. Start with patient, treatment and hospital details in one form;
+policy name, number and PDF are collected afterwards and can be added later.
+Star Health, HDFC ERGO, Niva Bupa and Care Health are supported. **Save draft**
+persists an unfinished intake. Cashless claims lead to hospital/insurer guidance.
+
+The document checklist is prepared before hospital records are uploaded. Planning
+reads only an attached policy; without one, it uses clearly labelled provisional
+insurer guidance without an extraction call. Each checklist item has instructions
+and its own upload control, with a chat assistant beside the checklist. Additional
+questions determine which conditional documents apply. Duplicate requests for the
+same document share one upload card. Uploaded files remain pending review.
+
+Users can upload what they have, then review extracted values against page previews.
+Final approval still requires a verified matching policy, complete requirements,
+confirmed values and form acknowledgments. Changes invalidate previous approval.
+Missing policy identity may be filled in after uploads; changing an established
+identity requires removing attached documents first.
 
 Apply the additive schema migration before using this release:
 
@@ -20,7 +30,59 @@ env/Scripts/python.exe -m alembic upgrade head
 `GET /api/v1/health/insurers` returns the authenticated, versioned guidance registry.
 `PATCH /api/v1/claims/{id}` saves a full intake replacement for an owned draft.
 Existing claims without structured intake retain the previous analysis behavior.
-The new details also accompany agent classification, chat context and JSON drafts.
+The new details accompany preparation, chat context and approved drafts.
+
+## Document review and claim pack
+
+Open **Documents & help** to gather files, then **Review uploaded documents**:
+
+1. Upload policy wording and supporting PDFs or JPG/PNG/TIFF photos. Native PDF
+   text is read locally; scanned pages and photos use local RapidOCR. Page previews,
+   low-quality warnings and a confirmed document category support review. The first
+   OCR run may download model weights. Uploads are limited to 10 MB and PDF reading
+   to 120 pages; unreadable or over-limit files block preparation.
+2. Read new supporting documents when entering review, then check values beside the original.
+   Each suggested value has a page, source quote and confidence. Correct or add
+   missed fields and explicitly confirm values, category and page quality.
+3. Answer conditional checklist questions. Published insurer guidance is distinct
+   from requirements quoted from the uploaded policy. Unrecognized policy document
+   types require an explicit attachment link, rather than matching every Other file.
+4. Confirm policy applicability and the official form template, edit form values,
+   then resolve deterministic validation issues. Names, dates, bills, receipts,
+   bank details, duplicate documents and missing requirements are checked locally.
+5. Use **Approve & download claim pack** for the current draft's ZIP: editable official
+   claim form, submission guide, index/checklist, confirmed field review, manifest,
+   attachment PDFs and untouched originals. Every edit, upload or deletion invalidates
+   approval; outdated browser revisions cannot overwrite newer work.
+
+Star Health, Care Health, Niva Bupa and HDFC ERGO templates are installed. HDFC has
+separate hospitalization and myOptima Secure templates. Templates are pinned by
+SHA-256 and carry official source URLs and review dates in
+`app/assets/forms/manifest.json`; update them using `tools/fetch_claim_forms.py`
+only after reviewing the official sources and field mapping. Unknown answers,
+claimant signatures and hospital/doctor declarations remain for manual completion.
+The pack is prepared for manual submission; it does not submit a claim or determine
+coverage. Attachment copies use a conservative 5 MB limit; verify current portal
+rules and inspect copies before uploading. Originals are retained in the ZIP.
+
+### Gemini cost and token use
+
+The health pipeline makes one structured extraction call per batch of **new or
+changed** documents (up to 8 documents / 240,000 text characters). It allows
+**16,384 output tokens** rather than truncating extraction to a small answer.
+Raw extraction and local OCR are persisted and keyed by content hash, reader/
+extractor version and model. Identical files reuse an owner-scoped cache; user
+corrections never transfer between claims. Successful batches survive later failures.
+Retries require an explicit user action; automatic SDK retries are disabled.
+
+There are **zero Gemini calls** for unchanged reanalysis, corrections, checklist
+answers, validation, approval, previews, PDF generation or ZIP export. Routine chat
+questions use saved data locally. A custom question uses compact saved claim context
+and up to 4,096 output tokens, with repeated answers cached by claim revision and
+model. Extraction request and token counts remain available in the API. Legacy claims without
+health intake retain the older LangGraph workflow and its separate call pattern.
+Configuration defaults live in `app/core/config.py`; changing the Gemini model
+intentionally invalidates its extraction cache.
 
 Guidance is maintained in `app/health_guidance.json`. It records official source
 URLs, source references per instruction, scope, version and last-checked date.
@@ -32,12 +94,6 @@ version and date. Do not treat general guidance as the user's policy wording or
 calculate an authoritative deadline without confirming policy applicability.
 The current Star Health guidance explicitly flags its claims-page/form conflict
 (15 versus 30 days after discharge). Other uncertain deadlines remain unspecified.
-
-The deterministic health API tests run against an isolated in-memory test database
-without an LLM or live insurer calls. Optional browser QA can run
-`env/Scripts/python.exe -m tests.serve_health_smoke` with a temporary
-`VITE_API_URL=http://127.0.0.1:8001`; the synthetic account and data are discarded
-when that test server exits. Never point browser QA at actual medical records.
 
 FastAPI + React/TypeScript + LangGraph + **PostgreSQL for both application tables and workflow checkpoints**.
 
@@ -51,7 +107,7 @@ FastAPI + React/TypeScript + LangGraph + **PostgreSQL for both application table
    audit events, database migration, test suite, Docker development setup (Phase 4).
 
 **Not a production insurance platform.** No insurer integration, no claim filing, no
-eligibility decision, no OCR for scanned PDFs. Never use actual personal or medical
+eligibility decision. Never use actual personal or medical
 records in this demonstration. Gemini receives uploaded document text.
 
 ## Local setup (Windows PowerShell)
@@ -86,8 +142,8 @@ npm run dev
 - Frontend: http://localhost:5173
 - Swagger API: http://127.0.0.1:8000/docs
 
-Register in the UI, create a claim, upload **one text-readable policy PDF** and
-optional supporting PDFs, run the agent, inspect the checklist, review and export.
+Register in the UI, complete health intake, upload policy wording and supporting
+PDFs/photos, analyze changed documents, review evidence and prepare a submission pack.
 
 Step 3 opens the ClaimWeave assistant chat. Select **Start analysis** or type
 “Analyze my claim” to begin. The conversation shows the current checkpoint stage
@@ -135,7 +191,18 @@ Old SQLite LangGraph checkpoints are **not migrated**; restart old workflows as 
 | POST | `/api/v1/claims` | Create claim |
 | GET | `/api/v1/claims` | List own claims |
 | GET | `/api/v1/claims/{id}` | View own claim |
-| POST | `/api/v1/claims/{id}/documents` | Upload PDF |
+| PATCH | `/api/v1/claims/{id}` | Edit structured health intake |
+| DELETE | `/api/v1/claims/{id}` | Delete own claim and stored documents |
+| POST | `/api/v1/claims/{id}/documents` | Upload PDF/photo |
+| DELETE | `/api/v1/claims/{id}/documents/{doc}` | Remove document and invalidate approval |
+| GET | `/api/v1/claims/{id}/documents/{doc}/preview?page=1` | Protected PNG page preview |
+| GET | `/api/v1/claims/{id}/preparation` | Saved health preparation |
+| POST | `/api/v1/claims/{id}/preparation/analyze` | Extract changed files and validate |
+| PATCH | `/api/v1/claims/{id}/documents/{doc}/review` | Save field/category/quality confirmations |
+| PATCH | `/api/v1/claims/{id}/preparation` | Save conditions, attachment links and form values |
+| POST | `/api/v1/claims/{id}/preparation/approve` | Approve current validated revision |
+| GET | `/api/v1/claims/{id}/preparation/form` | Download editable official form draft |
+| GET | `/api/v1/claims/{id}/preparation/pack` | Download current approved ZIP |
 | POST | `/api/v1/claims/{id}/workflow/start` | Run workflow |
 | GET | `/api/v1/claims/{id}/workflow` | View workflow |
 | POST | `/api/v1/claims/{id}/workflow/review` | Resume human approval |
@@ -144,27 +211,6 @@ Old SQLite LangGraph checkpoints are **not migrated**; restart old workflows as 
 Except registration, login and health, routes require a Bearer token.
 The frontend keeps the token in **sessionStorage** (cleared when the tab session ends).
 This is a development choice; production should use hardened session handling.
-
-## Tests
-
-Pure logic tests and security tests:
-
-```powershell
-pytest -q
-```
-
-For API/database integration tests, create a **disposable** PostgreSQL database
-whose name contains `claimpilot_test`, then set:
-
-```powershell
-$env:TEST_DATABASE_URL='postgresql+psycopg://claimpilot:claimpilot@localhost:5432/claimpilot_test'
-pytest -q
-```
-
-The tests create/drop all application tables in the **test database**.
-Never point `TEST_DATABASE_URL` at a real claims database. PostgreSQL checkpoint
-integration requires a running database and `.setup()`; no live LLM evaluation is
-performed by this test suite.
 
 ## Known limitations / next hardening work
 

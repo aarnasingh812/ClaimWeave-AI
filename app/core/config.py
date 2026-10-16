@@ -11,6 +11,11 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ['http://localhost:5173', 'http://127.0.0.1:5173']
     google_api_key: str = ''
     gemini_model: str = 'gemini-2.5-flash'
+    extraction_max_output_tokens: int = 16384
+    extraction_batch_chars: int = 240000
+    extraction_batch_documents: int = 8
+    document_max_pages: int = 120
+    ocr_min_confidence: float = 0.75
     model_config = SettingsConfigDict(env_file='.env', extra='ignore')
 
     @field_validator('database_url')

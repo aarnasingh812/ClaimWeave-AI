@@ -14,8 +14,9 @@ def guidance_for(insurer: str):
 
 def intake_missing(policy_name: str, policy_number: str | None, description: str, intake: dict) -> list[str]:
     missing = []
-    for label, value in [('Policy name', policy_name), ('Policy number', policy_number),
-                         ('Treatment description', description)]:
+    # Policy identity is collected after the claim details. Final preparation still
+    # verifies the attached policy and requires the policy number on the form.
+    for label, value in [('Treatment description', description)]:
         if not value or not value.strip():
             missing.append(label)
     for field, label in [('patient_name', 'Patient name'), ('policyholder_name', 'Policyholder name'),

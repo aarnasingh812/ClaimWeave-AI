@@ -1,1 +1,1 @@
-{"root":["./src/agentchat.tsx","./src/app.tsx","./src/healthintakeform.tsx","./src/insurerguidance.tsx","./src/api.ts","./src/health.ts","./src/main.tsx","./src/types.ts","./src/vite-env.d.ts"],"version":"5.7.3"}
+{"root":["./src/agentchat.tsx","./src/app.tsx","./src/claimassistant.tsx","./src/claimjourney.tsx","./src/documentpreview.tsx","./src/healthintakeform.tsx","./src/insurerguidance.tsx","./src/preparationworkspace.tsx","./src/api.ts","./src/health.ts","./src/main.tsx","./src/types.ts","./src/vite-env.d.ts"],"version":"5.7.3"}

@@ -16,6 +16,8 @@ from app.api.policy_sources import router as policy_source_router
 app.include_router(policy_source_router)
 from app.api.health import router as health_router
 app.include_router(health_router)
+from app.api.preparation import router as preparation_router
+app.include_router(preparation_router)
 
 @app.get("/health")
 def health():
