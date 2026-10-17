@@ -35,12 +35,15 @@ async def save_document(upload: UploadFile, claim_id: str) -> tuple[str, int, st
                     raise HTTPException(415, 'Invalid PDF file')
         else:
             try:
+                # verify() reads to EOF and exhausts the file handle; open twice:
+                # first pass for integrity check, second pass for metadata checks.
+                with Image.open(path) as image:
+                    image.verify()
                 with Image.open(path) as image:
                     if image.format not in ('JPEG', 'PNG', 'TIFF') or image.width * image.height > 40_000_000:
                         raise ValueError('Unsupported image or image too large')
                     if getattr(image, 'n_frames', 1) != 1:
                         raise ValueError('Multi-page TIFF is not supported; upload individual pages or a PDF')
-                    image.verify()
             except Exception:
                 raise HTTPException(415, 'Invalid image. Upload a single JPG, PNG or TIFF page (maximum 40 megapixels).')
         return key, size, ALLOWED_EXTENSIONS[extension], digest.hexdigest()

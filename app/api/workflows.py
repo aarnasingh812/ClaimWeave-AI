@@ -92,16 +92,11 @@ def response_from_graph(graph, config):
 @router.post('/{claim_id}/workflow/start')
 def start_workflow(claim_id: str, db: Session = Depends(get_db), user: User = Depends(current_user)):
     claim = get_claim_or_404(db, claim_id, user)
+    # Health claims use the structured preparation workflow; cashless and
+    # completeness guards are enforced inside analyze_claim.
     if claim.health_intake is not None:
         from app.api.preparation import analyze_claim
         return analyze_claim(claim_id, db, user)
-    if claim.health_intake is not None:
-        missing = intake_missing(claim.policy_name, claim.policy_number, claim.claim_description, claim.health_intake)
-        if missing or not claim.health_intake.get('intake_completed'):
-            raise HTTPException(422, 'Complete and confirm your health claim intake before analysis' +
-                                (': ' + ', '.join(missing) if missing else ''))
-        if claim.health_intake.get('claim_route') == 'cashless':
-            raise HTTPException(409, 'Cashless requests must be coordinated with your hospital insurance desk; use insurer guidance')
     if not settings.google_api_key:
         raise HTTPException(503, 'GOOGLE_API_KEY is not configured')
     documents = db.scalars(select(ClaimDocument).where(ClaimDocument.claim_id == claim_id)).all()
@@ -183,7 +178,13 @@ def review_workflow(claim_id: str, decision: ReviewDecision, db: Session = Depen
                 raise HTTPException(409, 'No review interrupt is pending')
             graph.invoke(Command(resume={'approved': decision.approved}), config=config)
             output = response_from_graph(graph, config)
+    except HTTPException:
+        # Propagate 4xx responses (e.g. 'No review interrupt') directly; do not
+        # reset status or log them as infrastructure failures.
+        raise
     except Exception:
+        # Only true infrastructure failures (graph crash, DB error, etc.) should
+        # reset the claim so the user can retry.
         logger.exception('Review resume failed for claim %s', claim_id)
         db.execute(update(Claim).where(Claim.id == claim_id).values(status='awaiting_review'))
         db.commit()

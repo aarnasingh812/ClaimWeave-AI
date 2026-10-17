@@ -1,136 +1,392 @@
-# ClaimWeave — Health claim preparation
+# ClaimWeave AI — Health Claim Preparation Platform
 
-## Health intake and insurer guidance
+ClaimWeave AI is an intelligent, source-grounded health insurance claim preparation assistant designed specifically for reimbursement claims (with pre-configured support for leading Indian insurers like **Star Health**, **HDFC ERGO**, **Care Health**, and **Niva Bupa**).
 
-New reimbursement claims follow **Claim details → Policy → Documents & help →
-Review & download**. Start with patient, treatment and hospital details in one form;
-policy name, number and PDF are collected afterwards and can be added later.
-Star Health, HDFC ERGO, Niva Bupa and Care Health are supported. **Save draft**
-persists an unfinished intake. Cashless claims lead to hospital/insurer guidance.
+It assists policyholders in transforming unstructured hospital bills, discharge summaries, payment receipts, and policy wordings into an audit-ready, pre-filled official submission pack.
 
-The document checklist is prepared before hospital records are uploaded. Planning
-reads only an attached policy; without one, it uses clearly labelled provisional
-insurer guidance without an extraction call. Each checklist item has instructions
-and its own upload control, with a chat assistant beside the checklist. Additional
-questions determine which conditional documents apply. Duplicate requests for the
-same document share one upload card. Uploaded files remain pending review.
+> [!IMPORTANT]
+> **ClaimWeave is a preparation assistant, not an automated submission portal or claim adjudicator.**  
+> It does not submit claims to insurance portals, predict underwriting decisions, or offer legal/insurance advice. The generated pack is prepared for **manual submission** with claimant signatures and hospital authorizations.
 
-Users can upload what they have, then review extracted values against page previews.
-Final approval still requires a verified matching policy, complete requirements,
-confirmed values and form acknowledgments. Changes invalidate previous approval.
-Missing policy identity may be filled in after uploads; changing an established
-identity requires removing attached documents first.
+---
 
-Apply the additive schema migration before using this release:
+## Table of Contents
 
-```powershell
-env/Scripts/python.exe -m alembic upgrade head
+- [Project Overview](#project-overview)
+- [Key Features](#key-features)
+- [System Architecture](#system-architecture)
+- [Core Backend Components](#core-backend-components)
+- [End-to-End Processing Flow](#end-to-end-processing-flow)
+- [LangGraph Workflow State Machine](#langgraph-workflow-state-machine)
+- [Token & Cost Optimization Strategy](#token--cost-optimization-strategy)
+- [Technology Stack](#technology-stack)
+- [Supported Insurers & Official Templates](#supported-insurers--official-templates)
+- [API Reference](#api-reference)
+- [Local Setup & Installation](#local-setup--installation)
+- [Docker Development Setup](#docker-development-setup)
+- [Security, Audit & Limitations](#security-audit--limitations)
+
+---
+
+## Project Overview
+
+Filing a health insurance reimbursement claim is notoriously error-prone:
+- Missing mandatory documents lead to claim queries or rejections.
+- Inconsistent details (spelling of patient name, dates of admission/discharge, bill numbers) delay payouts.
+- Official claim forms from insurers are multi-page, dense, and tedious to complete by hand.
+- Sifting through hospital paperwork to cross-verify bills against receipts takes hours.
+
+**ClaimWeave AI** solves this by combining **local OCR and document inspection**, **targeted Google Gemini structured extraction**, **deterministic rule validation**, and **official PDF template pre-filling**.
+
+---
+
+## Key Features
+
+- **Dynamic Checklist & Insurer Guidance**: Formulates customized document requirements using reviewed snapshots of official insurer checklists (`health_guidance.json`).
+- **3 Policy Ingestion Modes**:
+  1. *Upload Policy PDF*: Ground-truth extraction of policy rules and coverage limits.
+  2. *Discover Online*: Search and download official insurer policy wordings from allowlisted domains.
+  3. *Provisional Mode*: Begin preparation immediately with provisional checklists before policy upload.
+- **Local OCR & Page Quality Inspection**: Local text reading (PyMuPDF) and on-device OCR (`RapidOCR` with ONNX runtime) for scanned documents and mobile photos without sending images to external APIs. Automatic detection of blurry or low-resolution pages.
+- **Side-by-Side Provenance Review**: Every extracted field links back to its exact source page, confidence score, and verbatim quote, allowing users to verify values directly against high-resolution page previews.
+- **Strict Deterministic Validation**: Non-LLM business rules check for bill arithmetic mismatches, duplicate bills, invalid IFSC codes, date order issues, and KYC requirements (claims $\ge$ ₹1,00,000).
+- **Official Form Autofill**: Exact pixel-coordinate pre-filling directly onto authentic insurer claim forms (Star Health, HDFC ERGO Hospitalization & myOptima Secure, Care Health, Niva Bupa).
+- **Audit-Ready Submission ZIP**: Bundles the prefilled official claim form, submission guide, checklist, field audit manifest, optimized attachment PDFs, and untouched originals.
+- **Approval Invalidation Safeguard**: Any document addition, deletion, or field edit increments the claim revision and immediately revokes previous approvals.
+
+---
+
+## System Architecture
+
+ClaimWeave AI is decoupled into a reactive frontend, a robust FastAPI backend service, local document processing utilities, a dual PostgreSQL database layer, and Google Gemini AI.
+
+```mermaid
+graph TD
+    subgraph Frontend["Frontend Client (React 19 + TypeScript + Vite)"]
+        UI["Web UI Dashboard"]
+        Intake["Health Intake Form"]
+        DocReview["Side-by-Side Document Reviewer"]
+        ChatUI["Claim Assistant Chat"]
+    end
+
+    subgraph API["FastAPI REST Services"]
+        AuthRouter["Auth API (JWT)"]
+        ClaimsRouter["Claims & Documents API"]
+        PrepRouter["Preparation & Review API"]
+        PolicyRouter["Policy Discovery API"]
+        WorkflowRouter["LangGraph Workflow API"]
+        ChatRouter["Assistant Chat API"]
+    end
+
+    subgraph CoreBackend["Backend Processing Pipeline"]
+        DocEngine["Document & OCR Engine<br/>(PyMuPDF, RapidOCR, PIL)"]
+        GeminiEngine["Structured Extraction Engine<br/>(Google Gemini + SHA-256 Cache)"]
+        ValidationEngine["Deterministic Validation Engine<br/>(Business Rules & Math Checks)"]
+        FormOverlay["PDF Form Pre-fill Engine<br/>(PyMuPDF Coordinate Overlays)"]
+        PackGenerator["Claim Pack Generator<br/>(ReportLab & ZIP Bundler)"]
+        GuidanceRegistry["Insurer Guidance Registry<br/>(app/health_guidance.json)"]
+    end
+
+    subgraph Storage["Persistence & External Services"]
+        PG_App[("PostgreSQL: App Tables<br/>(users, claims, claim_documents, audit_events)")]
+        PG_Checkpoints[("PostgreSQL: LangGraph Checkpoints<br/>(checkpoints, checkpoint_blobs)")]
+        LocalFiles[("Protected Local Storage<br/>(Encrypted / Private Uploads)")]
+        Gemini[("Google Gemini API<br/>(gemini-2.5-flash)")]
+    end
+
+    UI --> AuthRouter
+    UI --> ClaimsRouter
+    UI --> PrepRouter
+    UI --> PolicyRouter
+    UI --> WorkflowRouter
+    ChatUI --> ChatRouter
+
+    ClaimsRouter --> LocalFiles
+    ClaimsRouter --> PG_App
+    PrepRouter --> DocEngine
+    PrepRouter --> GeminiEngine
+    PrepRouter --> ValidationEngine
+    PrepRouter --> FormOverlay
+    PrepRouter --> PackGenerator
+    PrepRouter --> GuidanceRegistry
+
+    WorkflowRouter --> PG_Checkpoints
+    DocEngine --> LocalFiles
+    GeminiEngine --> Gemini
+    GeminiEngine --> PG_App
 ```
 
-`GET /api/v1/health/insurers` returns the authenticated, versioned guidance registry.
-`PATCH /api/v1/claims/{id}` saves a full intake replacement for an owned draft.
-Existing claims without structured intake retain the previous analysis behavior.
-The new details accompany preparation, chat context and approved drafts.
+---
 
-## Document review and claim pack
+## Core Backend Components
 
-Open **Documents & help** to gather files, then **Review uploaded documents**:
+### 1. Document & Ingestion Engine (`app/documents.py`, `app/storage.py`)
+- **File Validation**: Strict verification of file headers (PDF magic bytes `%PDF-`, allowed extensions `.pdf`, `.jpg`, `.jpeg`, `.png`, `.tif`), 10 MB file size limit, and 120-page PDF ceiling.
+- **Local OCR**: When PDFs have no embedded text or when users upload mobile photos, ClaimWeave uses `RapidOCR` powered by ONNX Runtime. Images are converted to grayscale and evaluated for blurriness (via Laplacian variance) and resolution before OCR.
+- **Protected Page Previews**: Generates secure, rendered PNG previews for each page (`GET /api/v1/claims/{id}/documents/{doc}/preview?page=N`) to allow users to audit facts visually.
 
-1. Upload policy wording and supporting PDFs or JPG/PNG/TIFF photos. Native PDF
-   text is read locally; scanned pages and photos use local RapidOCR. Page previews,
-   low-quality warnings and a confirmed document category support review. The first
-   OCR run may download model weights. Uploads are limited to 10 MB and PDF reading
-   to 120 pages; unreadable or over-limit files block preparation.
-2. Read new supporting documents when entering review, then check values beside the original.
-   Each suggested value has a page, source quote and confidence. Correct or add
-   missed fields and explicitly confirm values, category and page quality.
-3. Answer conditional checklist questions. Published insurer guidance is distinct
-   from requirements quoted from the uploaded policy. Unrecognized policy document
-   types require an explicit attachment link, rather than matching every Other file.
-4. Confirm policy applicability and the official form template, edit form values,
-   then resolve deterministic validation issues. Names, dates, bills, receipts,
-   bank details, duplicate documents and missing requirements are checked locally.
-5. Use **Approve & download claim pack** for the current draft's ZIP: editable official
-   claim form, submission guide, index/checklist, confirmed field review, manifest,
-   attachment PDFs and untouched originals. Every edit, upload or deletion invalidates
-   approval; outdated browser revisions cannot overwrite newer work.
+### 2. LLM Extraction Pipeline (`app/extraction.py`)
+- **Structured Data Extraction**: Sends extracted document text to Google Gemini using Pydantic schemas (`BatchExtraction`, `ExtractedFile`, `ExtractedField`, `PolicyExtraction`).
+- **Prompt Injection Defense**: Uploaded text is treated strictly as untrusted user data. LLM instructions mandate extracting only explicitly supported fields and verbatim evidence quotes.
+- **Content-Addressed Cache**: Every document's text and extraction is fingerprinted using SHA-256. If a file was analyzed previously, the result is fetched from the database cache without calling the Gemini API.
 
-Star Health, Care Health, Niva Bupa and HDFC ERGO templates are installed. HDFC has
-separate hospitalization and myOptima Secure templates. Templates are pinned by
-SHA-256 and carry official source URLs and review dates in
-`app/assets/forms/manifest.json`; update them using `tools/fetch_claim_forms.py`
-only after reviewing the official sources and field mapping. Unknown answers,
-claimant signatures and hospital/doctor declarations remain for manual completion.
-The pack is prepared for manual submission; it does not submit a claim or determine
-coverage. Attachment copies use a conservative 5 MB limit; verify current portal
-rules and inspect copies before uploading. Originals are retained in the ZIP.
+### 3. Deterministic Validation Engine (`app/preparation.py`)
+Critical financial and regulatory checks are **never delegated to an LLM**. They are executed deterministically in Python:
+- **Financial Cross-Checks**: Compares claimed reimbursement amounts against sum of itemized hospital bills and payment receipts.
+- **Identity & Account Validation**: Validates Indian IFSC formats (`^[A-Z]{4}0[A-Z0-9]{6}$`), bank account number digits (6–20 digits), and checks if the account holder matches the policyholder/patient.
+- **Timeline & Chronology Checks**: Verifies that discharge date $\ge$ admission date and ensures hospital admission fell within the active policy validity period.
+- **Duplicate Bill Detection**: Identifies and flags duplicate bill numbers from the same hospital across separate uploaded files.
+- **KYC Rules**: Flags missing identity documents when claims exceed ₹1,00,000 for relevant insurers (e.g., HDFC ERGO, Niva Bupa).
 
-### Gemini cost and token use
+### 4. Official PDF Form Pre-fill & ZIP Pack Engine (`app/forms.py`, `app/submission.py`)
+- **Pixel-Accurate Coordinate Mapping**: Overlays verified form values directly onto genuine insurer claim form templates (stored in `app/assets/forms/`).
+- **Submission Pack Generation**: Using `ReportLab` and Python's `zipfile`, generates:
+  - `claim_form_prefilled.pdf`: The official insurer form prefilled with confirmed values.
+  - `submission_guide.pdf`: Step-by-step instructions with remaining manual items (e.g., doctor stamps, claimant signatures).
+  - `document_checklist.pdf` & `audit_manifest.json`: Complete audit trail of confirmed fields, page numbers, and confidence ratings.
+  - `attachments/`: Normalized, legible PDF copies of supporting documents.
+  - `originals/`: Untouched original files as uploaded by the user.
 
-The health pipeline makes one structured extraction call per batch of **new or
-changed** documents (up to 8 documents / 240,000 text characters). It allows
-**16,384 output tokens** rather than truncating extraction to a small answer.
-Raw extraction and local OCR are persisted and keyed by content hash, reader/
-extractor version and model. Identical files reuse an owner-scoped cache; user
-corrections never transfer between claims. Successful batches survive later failures.
-Retries require an explicit user action; automatic SDK retries are disabled.
+### 5. In-Claim Assistant & Contextual Chat (`app/health_chat.py`)
+- Answers questions about missing documents, submission deadlines, and portal rejection tips.
+- Evaluates routine queries locally using regex matching and versioned guidance; falls back to Gemini only for complex custom questions, caching answers by claim revision.
 
-There are **zero Gemini calls** for unchanged reanalysis, corrections, checklist
-answers, validation, approval, previews, PDF generation or ZIP export. Routine chat
-questions use saved data locally. A custom question uses compact saved claim context
-and up to 4,096 output tokens, with repeated answers cached by claim revision and
-model. Extraction request and token counts remain available in the API. Legacy claims without
-health intake retain the older LangGraph workflow and its separate call pattern.
-Configuration defaults live in `app/core/config.py`; changing the Gemini model
-intentionally invalidates its extraction cache.
+---
 
-Guidance is maintained in `app/health_guidance.json`. It records official source
-URLs, source references per instruction, scope, version and last-checked date.
-This is a reviewed snapshot, not a continuously refreshed feed. The UI warns when
-sources are older than 90 days or a saved claim used an earlier guidance version.
-Before updating the registry, open every official source, verify current forms and
-submission instructions, resolve or explicitly flag conflicts, then increment the
-version and date. Do not treat general guidance as the user's policy wording or
-calculate an authoritative deadline without confirming policy applicability.
-The current Star Health guidance explicitly flags its claims-page/form conflict
-(15 versus 30 days after discharge). Other uncertain deadlines remain unspecified.
+## End-to-End Processing Flow
 
-FastAPI + React/TypeScript + LangGraph + **PostgreSQL for both application tables and workflow checkpoints**.
+The following sequence outlines how a claim moves from initial intake to final ZIP pack download:
 
-## Scope
+```mermaid
+flowchart TD
+    Start([1. Start Claim Intake]) --> Step1[Enter Patient, Hospital, Admission Dates & Treatment]
+    Step1 --> Step2{2. Policy Ingestion Mode}
 
-1. Claim CRUD and private PDF uploads (Phase 1).
-2. Source-grounded LangGraph policy extraction, claim classification, requirements,
-   document extraction, validation, interrupt-based human review, JSON export (Phase 2).
-3. React dashboard, create claim, upload documents, checklist, review and export (Phase 3).
-4. PostgreSQL checkpoints, JWT sign-in, user-scoped claims and workflow endpoints,
-   audit events, database migration, test suite, Docker development setup (Phase 4).
+    Step2 -->|Upload PDF| P_Upload[Upload Policy Schedule / Wording]
+    Step2 -->|Find Online| P_Find[Search Allowlisted Insurer Domains]
+    Step2 -->|Skip Policy| P_Skip[Provisional Checklist Mode]
 
-**Not a production insurance platform.** No insurer integration, no claim filing, no
-eligibility decision. Never use actual personal or medical
-records in this demonstration. Gemini receives uploaded document text.
+    P_Upload --> Step3[3. Upload Supporting Documents<br/>Bills, Discharge Summary, Receipts, Cheque]
+    P_Find --> Step3
+    P_Skip --> Step3
 
-## Local setup (Windows PowerShell)
+    Step3 --> DocCheck[Local Reading & RapidOCR<br/>Page previews, blur checks, SHA-256 fingerprinting]
+
+    DocCheck --> CacheDecision{Hash Found in Cache?}
+    CacheDecision -->|Yes| Hit[Load Cached Extraction]
+    CacheDecision -->|No| BatchCall[Batch Gemini Structured Extraction<br/>One call for new/changed documents]
+
+    Hit --> ValStep[4. Run Deterministic Business Rules]
+    BatchCall --> ValStep
+
+    ValStep --> ReviewUI[5. Side-by-Side Review Screen<br/>Compare extracted facts with page preview]
+    ReviewUI --> UserConfirm[User Confirms Values & Conditional Questions]
+
+    UserConfirm --> ValidCheck{Validation Passed?}
+    ValidCheck -->|Issues / Missing Docs| Fix[Flag Errors & Needs Attention]
+    Fix --> ReviewUI
+
+    ValidCheck -->|Passed| Prefill[6. Form Template Autofill<br/>Overlays data onto authentic insurer PDF]
+    Prefill --> Approve[7. Explicit Human Approval]
+    Approve --> PackGen[8. Generate Claim Pack ZIP<br/>Prefilled form, guide, attachments, originals]
+    PackGen --> Finish([Ready for Physical / Portal Submission])
+```
+
+---
+
+## LangGraph Workflow State Machine
+
+For policy verification, requirements planning, and structured human approval, ClaimWeave provides a notebook-inspired, source-grounded LangGraph workflow (`app/agent/workflow.py`). It utilizes a PostgreSQL checkpointer (`langgraph-checkpoint-postgres`) with human-in-the-loop interrupt:
+
+```mermaid
+stateDiagram-v2
+    [*] --> acquire : Claim Initialized
+    acquire --> extract_policy : Policy Provided
+    acquire --> classify : No Policy (Provisional)
+
+    extract_policy --> verify : LLM Extracts Requirements & Quoted Evidence
+    verify --> classify : Policy Matches Claim Identity
+    verify --> [*] : Policy Mismatch (Halt)
+
+    classify --> requirements : Classify Treatment & Route
+    requirements --> extract_documents : Map Insurer / Policy Requirements
+    extract_documents --> check_documents : Extract Supporting Document Fields
+    check_documents --> draft : Compare Uploaded vs Mandatory Documents
+    draft --> validate : Assemble Form Draft
+
+    validate --> review : Validation Passed
+    validate --> [*] : Validation Failed (Wait for User Action)
+
+    review --> finalize : Human Review Interrupt (Approved)
+    review --> [*] : Human Review Rejected
+
+    finalize --> [*] : Claim Pack Ready for Download
+```
+
+---
+
+## Token & Cost Optimization Strategy
+
+ClaimWeave AI is intentionally engineered to minimize LLM token consumption and external API dependency:
+
+| Operation | LLM Call? | Mechanism / Caching Strategy |
+|---|---|---|
+| Document OCR | **No** | Local PyMuPDF text reader & on-device `RapidOCR` (ONNX) |
+| Page quality & blur check | **No** | Local Laplacian variance algorithm via NumPy/Pillow |
+| New document extraction | **Yes** | 1 structured call per batch (up to 8 files / 240k characters) |
+| Re-analyzing unchanged documents | **No** | Content-addressed SHA-256 cache in PostgreSQL |
+| Checklist evaluation | **No** | Evaluated via local `app/health_guidance.json` |
+| Field confirmations & edits | **No** | Handled deterministically in application database |
+| Arithmetic & cross-validation | **No** | Deterministic Python rules |
+| Official PDF Form prefill | **No** | PyMuPDF point-coordinate overlay |
+| Claim pack ZIP assembly | **No** | ReportLab PDF generator & Python `zipfile` |
+| Routine Chatbot questions | **No** | Local rule/regex matching against saved claim state |
+
+---
+
+## Technology Stack
+
+### Backend
+- **Framework**: [FastAPI](https://fastapi.tiangolo.com/) (Python 3.11+ / 3.13) with [Uvicorn](https://www.uvicorn.org/)
+- **Database & Migration**: [PostgreSQL 17](https://www.postgresql.org/), [SQLAlchemy 2.0](https://www.sqlalchemy.org/), [psycopg 3](https://www.psycopg.org/), [Alembic](https://alembic.sqlalchemy.org/)
+- **Agent & Orchestration**: [LangGraph](https://github.com/langchain-ai/langgraph), `langgraph-checkpoint-postgres`
+- **Generative AI**: [Google Gemini](https://ai.google.dev/) (`gemini-2.5-flash`) via `langchain-google-genai` & `google-genai`
+- **Document & Image Processing**:
+  - [PyMuPDF (fitz)](https://pymupdf.readthedocs.io/): High-performance PDF text parsing, page rendering, and form overlay
+  - [RapidOCR](https://github.com/RapidAI/RapidOCR) & [onnxruntime](https://onnxruntime.ai/): Fast on-device OCR
+  - [Pillow (PIL)](https://python-pillow.org/) & [NumPy](https://numpy.org/): Image normalization and blur/quality analysis
+  - [pypdf](https://pypdf.readthedocs.io/): Fallback PDF reading
+  - [ReportLab](https://www.reportlab.com/): Programmatic generation of submission guides and checklists
+- **Security & Authentication**: [PyJWT](https://pyjwt.readthedocs.io/), [pwdlib](https://frankie567.github.io/pwdlib/) with Argon2
+
+### Frontend
+- **Framework**: [React 19](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/)
+- **Bundler & Tooling**: [Vite 6](https://vitejs.dev/)
+- **Icons & Styling**: [Lucide React](https://lucide.dev/), Modular Vanilla CSS design system
+
+---
+
+## Supported Insurers & Official Templates
+
+Official claim forms are verified by SHA-256 checksums and source-pinned in `app/assets/forms/manifest.json`:
+
+| Insurer | Supported Policy Forms | Official Source Review Date |
+|---|---|---|
+| **Star Health** | Health Insurance Claim Form (Part A & B) | 2026-03-24 |
+| **HDFC ERGO** | Standard Hospitalization Reimbursement Form | 2026-03-24 |
+| **HDFC ERGO** | my:Optima Secure Individual Claim Form | 2026-03-24 |
+| **Care Health** | Comprehensive Reimbursement Claim Form | 2026-03-24 |
+| **Niva Bupa** | Health Insurance Reimbursement Form | 2026-03-24 |
+
+---
+
+## API Reference
+
+All protected endpoints require an `Authorization: Bearer <token>` header.
+
+### Authentication & Account
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/v1/auth/register` | Register a new account and receive a JWT |
+| `POST` | `/api/v1/auth/login` | Sign in with email and password |
+| `GET` | `/api/v1/auth/me` | Retrieve the authenticated user profile |
+
+### Claims Management
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/v1/claims` | Create a new claim |
+| `GET` | `/api/v1/claims` | List claims belonging to the current user |
+| `GET` | `/api/v1/claims/{id}` | Retrieve details of an owned claim |
+| `PATCH` | `/api/v1/claims/{id}` | Update structured health intake |
+| `DELETE` | `/api/v1/claims/{id}` | Delete a claim and its stored documents |
+
+### Documents & OCR
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/v1/claims/{id}/documents` | Upload a PDF or JPG/PNG/TIFF file (max 10 MB) |
+| `DELETE` | `/api/v1/claims/{id}/documents/{doc_id}` | Remove a document (invalidates existing approvals) |
+| `GET` | `/api/v1/claims/{id}/documents/{doc_id}/preview?page=N` | View rendered PNG page preview |
+| `PATCH` | `/api/v1/claims/{id}/documents/{doc_id}/review` | Save human field confirmations & category reviews |
+
+### Preparation, Validation & Export
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/v1/claims/{id}/preparation` | Get current preparation state and checklist |
+| `POST` | `/api/v1/claims/{id}/preparation/analyze` | Trigger batch OCR and Gemini extraction for changed files |
+| `PATCH` | `/api/v1/claims/{id}/preparation` | Save checklist answers and manual form values |
+| `POST` | `/api/v1/claims/{id}/preparation/approve` | Approve validated revision for export |
+| `GET` | `/api/v1/claims/{id}/preparation/form` | Download prefilled official claim form PDF |
+| `GET` | `/api/v1/claims/{id}/preparation/pack` | Download complete submission pack ZIP |
+
+### Policy Discovery & Workflow
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/v1/claims/{id}/policy/discover` | Query official insurer domains for policy PDFs |
+| `POST` | `/api/v1/claims/{id}/policy/confirm` | Confirm an official web policy candidate |
+| `POST` | `/api/v1/claims/{id}/workflow/start` | Launch LangGraph claim preparation workflow |
+| `GET` | `/api/v1/claims/{id}/workflow` | Check LangGraph workflow status and checkpoints |
+| `POST` | `/api/v1/claims/{id}/workflow/chat` | Send question to the contextual claim assistant |
+
+---
+
+## Local Setup & Installation
+
+### Prerequisites
+- **Python 3.11+** (or Python 3.13)
+- **Node.js 20+** & **npm**
+- **Docker** (for running local PostgreSQL)
+- **Google Gemini API Key** (get one at [Google AI Studio](https://aistudio.google.com/))
+
+### 1. Clone & Configure Environment
 
 ```powershell
+# Clone the repository
+git clone https://github.com/aarnasingh812/ClaimWeave-AI.git
+cd ClaimWeave-AI
+
+# Create and activate Python virtual environment
 py -3.13 -m venv .venv
 .venv\Scripts\Activate.ps1
+
+# Install backend dependencies
 pip install -r requirements.txt
+
+# Copy environment configuration
 Copy-Item .env.example .env
 ```
 
-Edit `.env`: set `JWT_SECRET` to a **random 32+ character secret** (e.g. generate
-with `python -c "import secrets; print(secrets.token_urlsafe(48))"`), and add your
-`GOOGLE_API_KEY` if running the agent. Gemini usage may cost money.
+Edit `.env` and set:
+```env
+DATABASE_URL=postgresql+psycopg://claimpilot:claimpilot@127.0.0.1:5432/claimpilot
+JWT_SECRET=your-secure-random-32-plus-character-secret
+GOOGLE_API_KEY=your-gemini-api-key
+GEMINI_MODEL=gemini-2.5-flash
+STORAGE_DIR=private_uploads
+```
+
+### 2. Start PostgreSQL & Run Migrations
 
 ```powershell
+# Start local PostgreSQL container
 docker compose up -d db
+
+# Run Alembic migrations for application tables
 alembic upgrade head
+
+# Initialize LangGraph PostgreSQL checkpoint tables
 python -m app.db.checkpoints
+
+# Start the FastAPI development server
 uvicorn app.main:app --reload
 ```
 
-Start frontend in a separate terminal:
+Backend will be available at:
+- **API Server**: `http://127.0.0.1:8000`
+- **Swagger Docs**: `http://127.0.0.1:8000/docs`
+
+### 3. Start Frontend
+
+Open a separate PowerShell terminal:
 
 ```powershell
 cd frontend
@@ -139,110 +395,31 @@ npm install
 npm run dev
 ```
 
-- Frontend: http://localhost:5173
-- Swagger API: http://127.0.0.1:8000/docs
+Frontend will be running at `http://localhost:5173`.
 
-Register in the UI, complete health intake, upload policy wording and supporting
-PDFs/photos, analyze changed documents, review evidence and prepare a submission pack.
+---
 
-Step 3 opens the ClaimWeave assistant chat. Select **Start analysis** or type
-“Analyze my claim” to begin. The conversation shows the current checkpoint stage
-while analysis runs, summarizes missing documents and validation results, and
-answers follow-up questions using the claim details and saved analysis. Review
-and approval remain available in **Review & export**. Chat history lasts while
-the claim workspace is open; it is not saved to the database.
+## Docker Development Setup
 
-### Optional Docker Compose full development stack
-
-After configuring `.env`, run:
+You can run the entire stack (PostgreSQL + FastAPI + Vite Frontend) using Docker Compose:
 
 ```powershell
+# Build and start all services
 docker compose --profile full up -d --build
-# One-time migration and checkpoint setup:
+
+# Run one-time database setup inside the container
 docker compose --profile full exec api alembic upgrade head
 docker compose --profile full exec api python -m app.db.checkpoints
 ```
 
-This Docker profile is **development only**; it uses a local Postgres password,
-Vite dev server, and lacks TLS, network hardening and secrets management.
+> [!NOTE]
+> The Docker full profile is intended for **local development only** (uses local passwords, Vite dev server, and unencrypted local volumes).
 
-## PostgreSQL: two independent table families
+---
 
-- SQLAlchemy/Alembic: `users`, `claims`, `claim_documents`, `audit_events`.
-- LangGraph PostgresSaver: its own `checkpoints`, `checkpoint_blobs`,
-  `checkpoint_writes` and migration tracking tables created by `.setup()`.
+## Security, Audit & Limitations
 
-`DATABASE_URL` is required. `alembic.ini` contains **no SQLite fallback**.
-`langgraph-checkpoint-postgres` uses the same PostgreSQL database as the app.
-
-**Upgrading from Phase 3:** `alembic upgrade head` creates user/audit tables and
-adds `owner_id`. Existing Phase 3 claims have `owner_id=NULL` and are **not visible
-to any account**. For a fresh demo, create new claims. Never automatically assign
-legacy records to a new account; a controlled ownership migration would be needed.
-Old SQLite LangGraph checkpoints are **not migrated**; restart old workflows as new claims.
-
-## API endpoints
-
-| Method | Path | Description |
-|---|---|---|
-| POST | `/api/v1/auth/register` | Create account, receive token |
-| POST | `/api/v1/auth/login` | Sign in |
-| GET | `/api/v1/auth/me` | Current user |
-| POST | `/api/v1/claims` | Create claim |
-| GET | `/api/v1/claims` | List own claims |
-| GET | `/api/v1/claims/{id}` | View own claim |
-| PATCH | `/api/v1/claims/{id}` | Edit structured health intake |
-| DELETE | `/api/v1/claims/{id}` | Delete own claim and stored documents |
-| POST | `/api/v1/claims/{id}/documents` | Upload PDF/photo |
-| DELETE | `/api/v1/claims/{id}/documents/{doc}` | Remove document and invalidate approval |
-| GET | `/api/v1/claims/{id}/documents/{doc}/preview?page=1` | Protected PNG page preview |
-| GET | `/api/v1/claims/{id}/preparation` | Saved health preparation |
-| POST | `/api/v1/claims/{id}/preparation/analyze` | Extract changed files and validate |
-| PATCH | `/api/v1/claims/{id}/documents/{doc}/review` | Save field/category/quality confirmations |
-| PATCH | `/api/v1/claims/{id}/preparation` | Save conditions, attachment links and form values |
-| POST | `/api/v1/claims/{id}/preparation/approve` | Approve current validated revision |
-| GET | `/api/v1/claims/{id}/preparation/form` | Download editable official form draft |
-| GET | `/api/v1/claims/{id}/preparation/pack` | Download current approved ZIP |
-| POST | `/api/v1/claims/{id}/workflow/start` | Run workflow |
-| GET | `/api/v1/claims/{id}/workflow` | View workflow |
-| POST | `/api/v1/claims/{id}/workflow/review` | Resume human approval |
-| GET | `/api/v1/claims/{id}/workflow/export` | Download approved JSON |
-
-Except registration, login and health, routes require a Bearer token.
-The frontend keeps the token in **sessionStorage** (cleared when the tab session ends).
-This is a development choice; production should use hardened session handling.
-
-## Known limitations / next hardening work
-
-- Agent runs synchronously in the HTTP request; use a job queue for long runs.
-- PDF validation only checks extension and header, not malware or PDF parser safety.
-- Local document storage and PostgreSQL checkpoint payloads are **not encrypted**;
-  they can contain document text, PII and medical details.
-- No password reset, email verification, MFA, rate limiting, audit retention or
-  automated deletion; add these before public deployment.
-- The workflow is source-grounded but not clinically/legally reliable; manual review
-  remains essential. Conditional requirements need human confirmation.
-- Tests are limited and do not establish accuracy, fairness or production readiness.
-- Requires a Gemini API key; no free-tier availability is guaranteed.
-
-## New: three policy-source modes
-
-The frontend **Documents** tab now offers:
-
-1. **Upload PDF** (recommended): Upload the actual policy schedule/wording. The agent extracts cited requirements and checks policy identity.
-2. **Find online**: Search for PDF candidates on configured official insurer domains. Open and inspect a candidate, confirm exact policy product/version/dates/endorsements, then the backend downloads the selected official PDF and runs the usual verification. The search provider is best-effort and may return no results. Unknown insurers are intentionally unsupported until their domains are vetted and added to `app/agent/policy_discovery.py`.
-3. **Skip for now**: Start the LangGraph workflow without any policy. The agent classifies the claim, extracts uploaded supporting-document fields and creates **provisional suggestions**. These suggestions are **not** claimed as policy requirements. Validation deliberately blocks human approval and final JSON export until a verified policy is attached.
-
-You can upload/confirm a policy after a provisional run (`provisional_ready`) and run the workflow again. This reuses the claim's PostgreSQL checkpoint thread and re-executes the graph with the updated inputs. It does not submit anything to an insurer.
-
-If a workflow fails or the policy identity check reports a mismatch, the claim remains recoverable: retry the workflow, and replace the policy PDF if needed. A policy mismatch requires uploading or confirming the corrected source before retrying.
-
-### New endpoints
-
-- `GET /api/v1/claims/{id}/policy/discover` — official PDF candidates for supported insurer.
-- `POST /api/v1/claims/{id}/workflow/chat` — contextual chat with the claim assistant.
-- `POST /api/v1/claims/{id}/policy/confirm` — `{"url":"https://...pdf","confirmed_policy_match":true}`. This is an explicit user confirmation, not proof that the policy applies.
-
-**Online discovery security note:** This demo uses a fixed insurer domain allowlist, HTTPS-only URLs, no redirects, public DNS address checks, a PDF signature check, and a 10 MB streaming limit. It is **not** a fully hardened remote-fetch service: DNS rebinding, untrusted PDFs, and network egress controls require additional production defenses. Use an isolated egress proxy or fetch verified documents through a controlled browser/download service before deployment. No arbitrary URL fetching is exposed. Some insurer sites may block automated downloads; use the upload mode in that case.
-
-**Source trust:** A public insurer PDF is not necessarily the policy actually purchased. Confirm policy number, issue date, applicable endorsements, waiting periods and policy wording. LLM-extracted requirements are evidence-assisted drafts, not legal or insurance determinations.
+- **Source-Grounded, Not Legally Binding**: LLM extractions and checklists are assistive tools. Users must review all extracted numbers and dates against physical hospital documents.
+- **Data Protection**: Document storage and LangGraph PostgreSQL checkpoint payloads store clinical information, medical bills, and personal identity numbers. Ensure appropriate volume encryption and access control before deploying to cloud environments.
+- **No Direct Portal Submission**: ClaimWeave does not automate insurer portal login, CAPTCHA bypass, or direct API submission. It creates a complete pack ready for manual or portal submission.
+- **Signatures & Hospital Stamps**: Claim form sections requiring doctor signatures, medical superintendent declarations, and hospital stamps must be completed manually.

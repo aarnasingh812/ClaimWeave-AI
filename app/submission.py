@@ -131,6 +131,7 @@ def portal_copies(data: bytes, maximum: int) -> list[bytes]:
                 # Re-render only the oversized outgoing COPY. The original is retained in the ZIP.
                 pix = page.get_pixmap(matrix=fitz.Matrix(2.2, 2.2), alpha=False)
                 jpg = pix.tobytes('jpeg', jpg_quality=85)
+                single.close()  # close before reassigning to avoid a file-handle leak
                 single = fitz.open()
                 target = single.new_page(width=page.rect.width, height=page.rect.height)
                 target.insert_image(target.rect, stream=jpg)
