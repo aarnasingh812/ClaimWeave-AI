@@ -41,7 +41,7 @@ export default function AgentChat({claim, workflow, onWorkflow, onDocuments, onC
   const running = working || claim.status === 'running';
   const intakeReady = !claim.health_intake || (claim.health_intake.intake_completed && !claim.intake_missing?.length);
   const cashless = claim.health_intake?.claim_route === 'cashless';
-  const canStart = ['draft', 'provisional_ready', 'workflow_error', 'policy_mismatch'].includes(claim.status) && intakeReady && !cashless;
+  const canStart = !['running','reviewing'].includes(claim.status) && intakeReady && !cashless;
   useEffect(() => {
     setMessages(previous => previous.length === 1 ? [{role: 'assistant', content:
       `Hi, I’m your ClaimWeave assistant. I’ll help you prepare your ${claim.policy_name} claim. You have ${claim.documents.length} document(s) attached. Start analysis when you’re ready, or ask me about the preparation process.`}] : previous);

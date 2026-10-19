@@ -66,6 +66,7 @@ class ClaimCreate(BaseModel):
         return self
 
 class ClaimOut(ClaimCreate):
+    revision: int = 0
     guidance_version: str | None = None
     policy_source_mode: str
     policy_source_url: str | None
@@ -89,6 +90,7 @@ class DocumentOut(BaseModel):
     document_type: str
     original_filename: str
     size_bytes: int
+    content_type: str = 'application/pdf'
     uploaded_at: datetime
     model_config = ConfigDict(from_attributes=True)
 

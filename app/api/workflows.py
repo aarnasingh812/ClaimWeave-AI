@@ -22,6 +22,7 @@ router = APIRouter(prefix='/api/v1/claims', tags=['agent'])
 
 class ReviewDecision(BaseModel):
     approved: bool
+    expected_revision: int | None = Field(default=None, ge=0)
 
 class ChatMessage(BaseModel):
     role: Literal['user', 'assistant']
@@ -35,6 +36,9 @@ class ChatRequest(BaseModel):
 def chat_with_agent(claim_id: str, payload: ChatRequest, db: Session = Depends(get_db),
                     user: User = Depends(current_user)):
     claim = get_claim_or_404(db, claim_id, user)
+    if claim.health_intake is not None:
+        from app.health_chat import health_chat
+        return health_chat(db, claim, payload.message, [item.model_dump() for item in payload.history])
     if not settings.google_api_key:
         raise HTTPException(503, 'GOOGLE_API_KEY is not configured')
     context = {'insurer': claim.insurer, 'policy_name': claim.policy_name,
@@ -88,13 +92,11 @@ def response_from_graph(graph, config):
 @router.post('/{claim_id}/workflow/start')
 def start_workflow(claim_id: str, db: Session = Depends(get_db), user: User = Depends(current_user)):
     claim = get_claim_or_404(db, claim_id, user)
+    # Health claims use the structured preparation workflow; cashless and
+    # completeness guards are enforced inside analyze_claim.
     if claim.health_intake is not None:
-        missing = intake_missing(claim.policy_name, claim.policy_number, claim.claim_description, claim.health_intake)
-        if missing or not claim.health_intake.get('intake_completed'):
-            raise HTTPException(422, 'Complete and confirm your health claim intake before analysis' +
-                                (': ' + ', '.join(missing) if missing else ''))
-        if claim.health_intake.get('claim_route') == 'cashless':
-            raise HTTPException(409, 'Cashless requests must be coordinated with your hospital insurance desk; use insurer guidance')
+        from app.api.preparation import analyze_claim
+        return analyze_claim(claim_id, db, user)
     if not settings.google_api_key:
         raise HTTPException(503, 'GOOGLE_API_KEY is not configured')
     documents = db.scalars(select(ClaimDocument).where(ClaimDocument.claim_id == claim_id)).all()
@@ -141,7 +143,10 @@ def start_workflow(claim_id: str, db: Session = Depends(get_db), user: User = De
 
 @router.get('/{claim_id}/workflow')
 def workflow_status(claim_id: str, db: Session = Depends(get_db), user: User = Depends(current_user)):
-    get_claim_or_404(db, claim_id, user)
+    claim = get_claim_or_404(db, claim_id, user)
+    if claim.health_intake is not None:
+        from app.preparation import preparation_response
+        return preparation_response(claim)
     config = thread_config(claim_id, user.id)
     with open_checkpointer() as saver:
         graph = make_graph(saver)
@@ -153,6 +158,12 @@ def workflow_status(claim_id: str, db: Session = Depends(get_db), user: User = D
 def review_workflow(claim_id: str, decision: ReviewDecision, db: Session = Depends(get_db),
                     user: User = Depends(current_user)):
     claim = get_claim_or_404(db, claim_id, user)
+    if claim.health_intake is not None:
+        from app.api.preparation import approve_preparation, PreparationApproval
+        if decision.expected_revision is None:
+            raise HTTPException(422, 'Health preparation approval requires the expected_revision you reviewed')
+        return approve_preparation(claim_id, PreparationApproval(expected_revision=decision.expected_revision,
+                                                                 approved=decision.approved), db, user)
     changed = db.execute(update(Claim).where(Claim.id == claim_id, Claim.owner_id == user.id,
                                             Claim.status == 'awaiting_review').values(status='reviewing'))
     if changed.rowcount != 1:
@@ -167,7 +178,13 @@ def review_workflow(claim_id: str, decision: ReviewDecision, db: Session = Depen
                 raise HTTPException(409, 'No review interrupt is pending')
             graph.invoke(Command(resume={'approved': decision.approved}), config=config)
             output = response_from_graph(graph, config)
+    except HTTPException:
+        # Propagate 4xx responses (e.g. 'No review interrupt') directly; do not
+        # reset status or log them as infrastructure failures.
+        raise
     except Exception:
+        # Only true infrastructure failures (graph crash, DB error, etc.) should
+        # reset the claim so the user can retry.
         logger.exception('Review resume failed for claim %s', claim_id)
         db.execute(update(Claim).where(Claim.id == claim_id).values(status='awaiting_review'))
         db.commit()
@@ -181,6 +198,13 @@ def review_workflow(claim_id: str, decision: ReviewDecision, db: Session = Depen
 @router.get('/{claim_id}/workflow/export')
 def export_package(claim_id: str, db: Session = Depends(get_db), user: User = Depends(current_user)):
     claim = get_claim_or_404(db, claim_id, user)
+    if claim.health_intake is not None:
+        from app.preparation import rebuild_preparation
+        prep = rebuild_preparation(db, claim)
+        if prep.get('approved_revision') != claim.revision:
+            db.rollback()
+            raise HTTPException(409, 'Approve the current preparation revision before export')
+        return prep['package']
     if claim.status != 'package_ready':
         raise HTTPException(409, 'Claim package is not approved')
     with open_checkpointer() as saver:

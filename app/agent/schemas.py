@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Literal
 
-DocType = Literal["hospital_bill","discharge_summary","id_proof","cancelled_cheque","investigation_report","prescription","payment_receipt","fir_mlc","claim_form","other"]
+DocType = Literal["hospital_bill","discharge_summary","id_proof","cancelled_cheque","investigation_report","prescription","payment_receipt","fir_mlc","claim_form","implant_invoice","doctor_certificate","indoor_case_papers","pharmacy_bill","operation_notes","hospital_registration","other"]
 
 class Requirement(BaseModel):
     requirement_id: str

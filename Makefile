@@ -5,6 +5,3 @@ setup-db:
 
 run-api:
 	uvicorn app.main:app --reload
-
-test:
-	pytest -q

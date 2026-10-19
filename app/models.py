@@ -29,6 +29,8 @@ class Claim(Base):
     claim_description: Mapped[str] = mapped_column(Text)
     health_intake: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     guidance_version: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    preparation: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    revision: Mapped[int] = mapped_column(Integer, default=0, server_default='0')
     policy_source_mode: Mapped[str] = mapped_column(String(20), default='upload')
     policy_source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(40), default='draft')
@@ -45,6 +47,9 @@ class ClaimDocument(Base):
     storage_key: Mapped[str] = mapped_column(String(500), unique=True)
     content_type: Mapped[str] = mapped_column(String(100), default='application/pdf')
     size_bytes: Mapped[int] = mapped_column(Integer)
+    content_hash: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
+    analysis_cache: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    field_reviews: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     claim: Mapped[Claim] = relationship(back_populates='documents')
 

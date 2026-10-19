@@ -10,8 +10,10 @@ from app.core.security import current_user
 from app.core.config import settings
 from app.db.session import get_db
 from app.db.audit import audit
-from app.models import User, ClaimDocument
+from app.models import User, Claim, ClaimDocument
 from app.agent.policy_discovery import discover, download_official_pdf, domains_for
+from app.preparation import EDITABLE_STATUSES, invalidate_claim
+import hashlib
 
 router = APIRouter(prefix='/api/v1/claims', tags=['policy sources'])
 
@@ -28,7 +30,7 @@ def policy_search_support(claim_id: str, db: Session = Depends(get_db), user: Us
 @router.get('/{claim_id}/policy/discover')
 def search_official_policies(claim_id: str, db: Session = Depends(get_db), user: User = Depends(current_user)):
     claim = get_claim_or_404(db, claim_id, user)
-    if claim.status not in ('draft', 'provisional_ready', 'workflow_error', 'policy_mismatch'):
+    if claim.status not in EDITABLE_STATUSES:
         raise HTTPException(409, 'Cannot change policy after workflow starts')
     domains = domains_for(claim.insurer)
     return {'supported_insurer': bool(domains), 'official_domains': domains,
@@ -38,9 +40,11 @@ def search_official_policies(claim_id: str, db: Session = Depends(get_db), user:
 @router.post('/{claim_id}/policy/confirm')
 def confirm_official_policy(claim_id: str, selection: SourceSelection,
                             db: Session = Depends(get_db), user: User = Depends(current_user)):
-    claim = get_claim_or_404(db, claim_id, user)
-    recoverable = claim.status in ('workflow_error', 'policy_mismatch')
-    if claim.status not in ('draft', 'provisional_ready', 'workflow_error', 'policy_mismatch'):
+    claim = db.scalar(select(Claim).where(Claim.id == claim_id, Claim.owner_id == user.id).with_for_update())
+    if claim is None:
+        raise HTTPException(404, 'Claim not found')
+    recoverable = bool(claim.health_intake) or claim.status in ('workflow_error', 'policy_mismatch')
+    if claim.status not in EDITABLE_STATUSES:
         raise HTTPException(409, 'Workflow already started')
     if not selection.confirmed_policy_match:
         raise HTTPException(422, 'User confirmation is required')
@@ -59,12 +63,16 @@ def confirm_official_policy(claim_id: str, selection: SourceSelection,
         with path.open('xb') as f:
             f.write(data)
         doc = ClaimDocument(claim_id=claim_id, kind='policy', document_type='other',
-                            original_filename='official-policy.pdf', storage_key=key, size_bytes=len(data))
+                            original_filename='official-policy.pdf', storage_key=key, size_bytes=len(data),
+                            content_hash=hashlib.sha256(data).hexdigest())
         for old in existing:
             db.delete(old)
         db.add(doc)
         claim.policy_source_mode = 'online'
         claim.policy_source_url = str(selection.url)
+        if claim.preparation:
+            claim.preparation = {**claim.preparation, 'condition_answers': {}, 'requirement_documents': {}, 'policy_applicability_confirmed': False}
+        invalidate_claim(claim)
         audit(db, user.id, claim_id, 'online_policy_confirmed')
         db.commit()
     except Exception:
